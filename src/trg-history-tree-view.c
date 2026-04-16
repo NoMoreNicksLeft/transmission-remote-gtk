@@ -60,6 +60,10 @@ TrgHistoryTreeView *trg_history_tree_view_new(gpointer model,
     gtk_tree_view_set_model(GTK_TREE_VIEW(obj), GTK_TREE_MODEL(model));
     trg_tree_view_setup_columns(ttv);
 
+    /* Single selection for history — only one version can be started at a time */
+    gtk_tree_selection_set_mode(gtk_tree_view_get_selection(GTK_TREE_VIEW(obj)),
+                                GTK_SELECTION_SINGLE);
+
     /* Fix column widths after setup — Version and Active should be narrow,
      * Info Hash gets the remaining space */
     GList *cols = gtk_tree_view_get_columns(GTK_TREE_VIEW(obj));
