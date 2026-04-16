@@ -60,5 +60,21 @@ TrgHistoryTreeView *trg_history_tree_view_new(gpointer model,
     gtk_tree_view_set_model(GTK_TREE_VIEW(obj), GTK_TREE_MODEL(model));
     trg_tree_view_setup_columns(ttv);
 
+    /* Fix column widths after setup — Version and Active should be narrow,
+     * Info Hash gets the remaining space */
+    GList *cols = gtk_tree_view_get_columns(GTK_TREE_VIEW(obj));
+    for (GList *li = cols; li; li = g_list_next(li)) {
+        GtkTreeViewColumn *col = GTK_TREE_VIEW_COLUMN(li->data);
+        const gchar *title = gtk_tree_view_column_get_title(col);
+        if (g_strcmp0(title, _("Version")) == 0 || g_strcmp0(title, _("Active")) == 0) {
+            gtk_tree_view_column_set_expand(col, FALSE);
+            gtk_tree_view_column_set_fixed_width(col, 80);
+            gtk_tree_view_column_set_sizing(col, GTK_TREE_VIEW_COLUMN_FIXED);
+        } else {
+            gtk_tree_view_column_set_expand(col, TRUE);
+        }
+    }
+    g_list_free(cols);
+
     return self;
 }
