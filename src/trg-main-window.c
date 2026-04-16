@@ -47,6 +47,8 @@
 #include "util.h"
 
 #include "trg-about-window.h"
+#include "trg-history-model.h"
+#include "trg-history-tree-view.h"
 #include "trg-files-model.h"
 #include "trg-files-tree-view.h"
 #include "trg-main-window.h"
@@ -185,6 +187,8 @@ struct _TrgMainWindow {
 
     TrgPeersModel *peersModel;
     TrgPeersTreeView *peersTreeView;
+    TrgHistoryModel *historyModel;
+    TrgHistoryTreeView *historyTreeView;
 
     GtkWidget *hpaned, *vpaned;
     GtkWidget *filterEntry;
@@ -234,6 +238,7 @@ static void update_selected_torrent_notebook(TrgMainWindow *win, gint mode, gint
         trg_toolbar_torrent_actions_sensitive(win->toolBar, TRUE);
         trg_menu_bar_torrent_actions_sensitive(win->menuBar, TRUE);
         trg_general_panel_update(win->genDetails, t, &iter);
+        trg_history_model_update(win->historyModel, t);
         trg_trackers_model_update(win->trackersModel, serial, t, mode);
         trg_files_model_update(win->filesModel, GTK_TREE_VIEW(win->filesTreeView), serial, t, mode);
         trg_peers_model_update(win->peersModel, TRG_TREE_VIEW(win->peersTreeView), serial, t, mode);
@@ -768,6 +773,12 @@ static GtkWidget *trg_main_window_notebook_new(TrgMainWindow *win)
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
                              my_scrolledwin_new(GTK_WIDGET(win->peersTreeView)),
                              gtk_label_new(_("Peers")));
+
+    win->historyModel = trg_history_model_new();
+    win->historyTreeView = trg_history_tree_view_new(win->historyModel, win->client, win);
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
+                             my_scrolledwin_new(GTK_WIDGET(win->historyTreeView)),
+                             gtk_label_new(_("History")));
 
     return notebook;
 }

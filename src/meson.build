@@ -29,6 +29,8 @@ src_files = files(
   'trg-files-tree-view.c',
   'trg-files-tree.c',
   'trg-general-panel.c',
+  'trg-history-model.c',
+  'trg-history-tree-view.c',
   'trg-gtk-app.c',
   'trg-json-widgets.c',
   'trg-main-window.c',
