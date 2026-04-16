@@ -98,6 +98,8 @@ static void reannounce_cb(GtkWidget *w, TrgMainWindow *win);
 static void pause_cb(GtkWidget *w, TrgMainWindow *win);
 static void resume_cb(GtkWidget *w, TrgMainWindow *win);
 static void remove_cb(GtkWidget *w, TrgMainWindow *win);
+static void start_version_cb(GtkWidget *w, TrgMainWindow *win);
+static void history_selection_changed_cb(GtkTreeSelection *sel, TrgMainWindow *win);
 static void resume_all_cb(GtkWidget *w, TrgMainWindow *win);
 static void pause_all_cb(GtkWidget *w, TrgMainWindow *win);
 static void move_cb(GtkWidget *w, TrgMainWindow *win);
@@ -189,6 +191,7 @@ struct _TrgMainWindow {
     TrgPeersTreeView *peersTreeView;
     TrgHistoryModel *historyModel;
     TrgHistoryTreeView *historyTreeView;
+    GtkWidget *startVersionButton;
 
     GtkWidget *hpaned, *vpaned;
     GtkWidget *filterEntry;
@@ -678,6 +681,63 @@ static void move_cb(GtkWidget *w G_GNUC_UNUSED, TrgMainWindow *win)
             GTK_WIDGET(trg_torrent_move_dialog_new(win, win->client, win->torrentTreeView)));
 }
 
+static void start_version_cb(GtkWidget *w G_GNUC_UNUSED, TrgMainWindow *win)
+{
+    GtkTreeSelection *sel = gtk_tree_view_get_selection(GTK_TREE_VIEW(win->historyTreeView));
+    GtkTreeModel *model;
+    GtkTreeIter iter;
+
+    if (!gtk_tree_selection_get_selected(sel, &model, &iter))
+        return;
+
+    gchar *active_str = NULL;
+    gint64 seq = -1;
+    gtk_tree_model_get(model, &iter, HISTORYCOL_SEQ, &seq, HISTORYCOL_ACTIVE, &active_str, -1);
+
+    /* Don't start if already active */
+    if (active_str && g_strcmp0(active_str, "Yes") == 0) {
+        g_free(active_str);
+        return;
+    }
+    g_free(active_str);
+
+    if (seq < 0)
+        return;
+
+    /* Get the selected torrent's ID from the main torrent list */
+    gint64 torrent_id = win->selectedTorrentId;
+    if (torrent_id < 0)
+        return;
+
+    dispatch_rpc_async(win->client, btpk_start_version(torrent_id, seq),
+                       on_generic_interactive_action_response, win);
+}
+
+static void history_selection_changed_cb(GtkTreeSelection *sel, TrgMainWindow *win)
+{
+    GtkTreeModel *model;
+    GtkTreeIter iter;
+    gboolean sensitive = FALSE;
+
+    if (gtk_tree_selection_get_selected(sel, &model, &iter)) {
+        gchar *active_str = NULL;
+        gtk_tree_model_get(model, &iter, HISTORYCOL_ACTIVE, &active_str, -1);
+        if (!active_str || g_strcmp0(active_str, "Yes") != 0)
+            sensitive = TRUE;
+        g_free(active_str);
+    }
+
+    gtk_widget_set_sensitive(win->startVersionButton, sensitive);
+
+    /* Update button label */
+    if (sensitive)
+        gtk_button_set_label(GTK_BUTTON(win->startVersionButton), _("Start Version"));
+    else if (gtk_tree_selection_get_selected(sel, &model, &iter))
+        gtk_button_set_label(GTK_BUTTON(win->startVersionButton), _("Already Active"));
+    else
+        gtk_button_set_label(GTK_BUTTON(win->startVersionButton), _("Start Version"));
+}
+
 static void remove_cb(GtkWidget *w G_GNUC_UNUSED, TrgMainWindow *win)
 {
     GtkTreeSelection *selection;
@@ -776,9 +836,32 @@ static GtkWidget *trg_main_window_notebook_new(TrgMainWindow *win)
 
     win->historyModel = trg_history_model_new();
     win->historyTreeView = trg_history_tree_view_new(win->historyModel, win->client, win);
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
-                             my_scrolledwin_new(GTK_WIDGET(win->historyTreeView)),
-                             gtk_label_new(_("History")));
+    {
+        GtkWidget *historyVbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+        gtk_box_pack_start(GTK_BOX(historyVbox),
+                           my_scrolledwin_new(GTK_WIDGET(win->historyTreeView)),
+                           TRUE, TRUE, 0);
+
+        GtkWidget *buttonBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+        gtk_widget_set_margin_start(buttonBox, 4);
+        gtk_widget_set_margin_end(buttonBox, 4);
+        gtk_widget_set_margin_bottom(buttonBox, 4);
+
+        win->startVersionButton = gtk_button_new_with_label(_("Start Version"));
+        gtk_widget_set_sensitive(win->startVersionButton, FALSE);
+        g_signal_connect(win->startVersionButton, "clicked",
+                         G_CALLBACK(start_version_cb), win);
+        gtk_box_pack_end(GTK_BOX(buttonBox), win->startVersionButton, FALSE, FALSE, 0);
+
+        GtkTreeSelection *historySel = gtk_tree_view_get_selection(GTK_TREE_VIEW(win->historyTreeView));
+        g_signal_connect(historySel, "changed", G_CALLBACK(history_selection_changed_cb), win);
+
+        gtk_box_pack_start(GTK_BOX(historyVbox), buttonBox, FALSE, FALSE, 0);
+        gtk_widget_show_all(historyVbox);
+
+        gtk_notebook_append_page(GTK_NOTEBOOK(notebook), historyVbox,
+                                 gtk_label_new(_("History")));
+    }
 
     return notebook;
 }

@@ -302,3 +302,14 @@ void request_set_tag_from_ids(JsonNode *req, JsonArray *ids)
                                                 : TORRENT_GET_TAG_MODE_FULL;
     request_set_tag(req, id);
 }
+
+JsonNode *btpk_start_version(gint64 torrent_id, gint64 seq)
+{
+    JsonNode *root = base_request(METHOD_BTPK_START_VERSION);
+    JsonObject *args = node_get_arguments(root);
+    JsonArray *ids = json_array_new();
+    json_array_add_int_element(ids, torrent_id);
+    json_object_set_array_member(args, PARAM_IDS, ids);
+    json_object_set_int_member(args, FIELD_BTPK_SEQ, seq);
+    return root;
+}
