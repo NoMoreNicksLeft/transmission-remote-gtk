@@ -197,4 +197,24 @@ enum {
 #define TFILE_BYTES_COMPLETED "bytesCompleted"
 #define TFILE_NAME            "name"
 
+/* btpk / mutable torrent (BEP 46) fields */
+
+#define FIELD_BTPK_PUB           "btpk_pub"
+#define FIELD_BTPK_SALT          "btpk_salt"
+#define FIELD_BTPK_SEQ           "btpk_seq"
+#define FIELD_BTPK_UPDATE_MODE   "btpk_update_mode"
+#define FIELD_BTPK_PENDING_SEQ   "btpk_pending_seq"
+#define FIELD_BTPK_HISTORY       "btpk_history"
+
+/* btpk RPC methods */
+
+#define METHOD_BTPK_PUBLISH       "btpk_publish"
+#define METHOD_BTPK_START_VERSION "btpk_start_version"
+#define METHOD_BTPK_APPLY         "btpk_apply"
+
+/* btpk RPC parameters */
+
+#define PARAM_PRIVATE_KEY      "private_key"
+#define PARAM_CONTINUE_SEEDING "continue_seeding"
+
 #endif /* PROTOCOL_CONSTANTS_H_ */

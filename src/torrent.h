@@ -148,4 +148,13 @@ gint64 peerfrom_get_ltep(JsonObject *pf);
 gint64 peerfrom_get_resume(JsonObject *pf);
 gint64 peerfrom_get_incoming(JsonObject *pf);
 gint64 peerfrom_get_lpd(JsonObject *pf);
+/* btpk / mutable torrent (BEP 46) */
+gboolean torrent_has_btpk(JsonObject *t);
+const gchar *torrent_get_btpk_pub(JsonObject *t);
+const gchar *torrent_get_btpk_salt(JsonObject *t);
+gint64 torrent_get_btpk_seq(JsonObject *t);
+gint64 torrent_get_btpk_update_mode(JsonObject *t);
+gint64 torrent_get_btpk_pending_seq(JsonObject *t);
+JsonArray *torrent_get_btpk_history(JsonObject *t);
+
 #endif /* TORRENT_H_ */

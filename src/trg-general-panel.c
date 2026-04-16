@@ -62,6 +62,11 @@ struct _TrgGeneralPanel {
     GtkLabel *gen_comment_label;
     GtkLabel *gen_hash_label;
     GtkLabel *gen_error_label;
+    GtkLabel *gen_btpk_pub_label;
+    GtkLabel *gen_btpk_salt_label;
+    GtkLabel *gen_btpk_seq_label;
+    GtkLabel *gen_btpk_mode_label;
+    GtkLabel *gen_btpk_pending_label;
     GtkTreeModel *model;
     TrgClient *tc;
 };
@@ -91,6 +96,12 @@ void trg_general_panel_clear(TrgGeneralPanel *panel)
     gtk_label_clear(panel->gen_hash_label);
     gtk_label_clear(panel->gen_error_label);
     gtk_label_clear(gen_panel_label_get_key_label(GTK_LABEL(panel->gen_error_label)));
+    gtk_label_clear(panel->gen_btpk_pub_label);
+    gtk_label_clear(panel->gen_btpk_salt_label);
+    gtk_label_clear(panel->gen_btpk_seq_label);
+    gtk_label_clear(panel->gen_btpk_mode_label);
+    gtk_label_clear(panel->gen_btpk_pending_label);
+    gtk_label_clear(gen_panel_label_get_key_label(GTK_LABEL(panel->gen_btpk_pub_label)));
 }
 
 static void gtk_label_clear(GtkLabel *l)
@@ -230,6 +241,55 @@ void trg_general_panel_update(TrgGeneralPanel *panel, JsonObject *t, GtkTreeIter
     gtk_label_set_text(GTK_LABEL(panel->gen_seeders_label), buf);
     g_snprintf(buf, sizeof(buf), "%" G_GINT64_FORMAT, leechers >= 0 ? leechers : 0);
     gtk_label_set_text(GTK_LABEL(panel->gen_leechers_label), buf);
+
+    /* btpk / mutable torrent fields */
+    if (torrent_has_btpk(t)) {
+        const gchar *pub = torrent_get_btpk_pub(t);
+        if (pub) {
+            /* Show fingerprint-style: first 8 hex pairs with colons */
+            gchar fingerprint[24];
+            if (strlen(pub) >= 16) {
+                g_snprintf(fingerprint, sizeof(fingerprint),
+                    "%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c",
+                    pub[0],pub[1],pub[2],pub[3],pub[4],pub[5],pub[6],pub[7],
+                    pub[8],pub[9],pub[10],pub[11],pub[12],pub[13],pub[14],pub[15]);
+            } else {
+                g_strlcpy(fingerprint, pub, sizeof(fingerprint));
+            }
+            gchar *keyMarkup = g_markup_printf_escaped("<b>%s:</b>", _("Public Key"));
+            gtk_label_set_markup(gen_panel_label_get_key_label(GTK_LABEL(panel->gen_btpk_pub_label)), keyMarkup);
+            g_free(keyMarkup);
+            gtk_label_set_text(GTK_LABEL(panel->gen_btpk_pub_label), fingerprint);
+        }
+        const gchar *salt = torrent_get_btpk_salt(t);
+        if (salt && strlen(salt) > 0)
+            gtk_label_set_text(GTK_LABEL(panel->gen_btpk_salt_label), salt);
+        gint64 seq = torrent_get_btpk_seq(t);
+        if (seq >= 0) {
+            g_snprintf(buf, sizeof(buf), "%" G_GINT64_FORMAT, seq);
+            gtk_label_set_text(GTK_LABEL(panel->gen_btpk_seq_label), buf);
+        }
+        gint64 mode = torrent_get_btpk_update_mode(t);
+        if (mode >= 0) {
+            const gchar *mode_str = mode == 0 ? _("Never") : mode == 1 ? _("Offered") : _("Versioned");
+            gtk_label_set_text(GTK_LABEL(panel->gen_btpk_mode_label), mode_str);
+        }
+        gint64 pending = torrent_get_btpk_pending_seq(t);
+        if (pending >= 0) {
+            gchar *pending_str = g_strdup_printf(_("seq %" G_GINT64_FORMAT " available"), pending);
+            gtk_label_set_text(GTK_LABEL(panel->gen_btpk_pending_label), pending_str);
+            g_free(pending_str);
+        } else {
+            gtk_label_set_text(GTK_LABEL(panel->gen_btpk_pending_label), _("None"));
+        }
+    } else {
+        gtk_label_clear(panel->gen_btpk_pub_label);
+        gtk_label_clear(gen_panel_label_get_key_label(GTK_LABEL(panel->gen_btpk_pub_label)));
+        gtk_label_clear(panel->gen_btpk_salt_label);
+        gtk_label_clear(panel->gen_btpk_seq_label);
+        gtk_label_clear(panel->gen_btpk_mode_label);
+        gtk_label_clear(panel->gen_btpk_pending_label);
+    }
 }
 
 static GtkLabel *trg_general_panel_add_label_with_width(TrgGeneralPanel *gp, char *key, guint col,
@@ -301,6 +361,13 @@ static void trg_general_panel_init(TrgGeneralPanel *self)
     self->gen_hash_label = trg_general_panel_add_label(self, _("Hash"), 0, 8);
 
     self->gen_error_label = trg_general_panel_add_label_with_width(self, "", 0, 9, -1);
+
+    /* btpk / mutable torrent rows — key labels populated dynamically */
+    self->gen_btpk_pub_label = trg_general_panel_add_label_with_width(self, "", 0, 10, -1);
+    self->gen_btpk_salt_label = trg_general_panel_add_label(self, _("Salt"), 0, 11);
+    self->gen_btpk_seq_label = trg_general_panel_add_label(self, _("Version"), 1, 11);
+    self->gen_btpk_mode_label = trg_general_panel_add_label(self, _("Update Mode"), 0, 12);
+    self->gen_btpk_pending_label = trg_general_panel_add_label(self, _("Pending Update"), 1, 12);
 
     gtk_grid_set_row_homogeneous(GTK_GRID(self), TRUE);
     gtk_grid_set_column_spacing(GTK_GRID(self), TRG_GENERAL_PANEL_SPACING_X);

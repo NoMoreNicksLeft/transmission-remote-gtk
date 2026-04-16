@@ -679,3 +679,52 @@ const gchar *file_get_name(JsonObject *f)
 {
     return json_object_get_string_member(f, TFILE_NAME);
 }
+
+/* btpk / mutable torrent (BEP 46) accessors */
+
+gboolean torrent_has_btpk(JsonObject *t)
+{
+    return json_object_has_member(t, FIELD_BTPK_PUB);
+}
+
+const gchar *torrent_get_btpk_pub(JsonObject *t)
+{
+    if (!json_object_has_member(t, FIELD_BTPK_PUB))
+        return NULL;
+    return json_object_get_string_member(t, FIELD_BTPK_PUB);
+}
+
+const gchar *torrent_get_btpk_salt(JsonObject *t)
+{
+    if (!json_object_has_member(t, FIELD_BTPK_SALT))
+        return NULL;
+    return json_object_get_string_member(t, FIELD_BTPK_SALT);
+}
+
+gint64 torrent_get_btpk_seq(JsonObject *t)
+{
+    if (!json_object_has_member(t, FIELD_BTPK_SEQ))
+        return -1;
+    return json_object_get_int_member(t, FIELD_BTPK_SEQ);
+}
+
+gint64 torrent_get_btpk_update_mode(JsonObject *t)
+{
+    if (!json_object_has_member(t, FIELD_BTPK_UPDATE_MODE))
+        return -1;
+    return json_object_get_int_member(t, FIELD_BTPK_UPDATE_MODE);
+}
+
+gint64 torrent_get_btpk_pending_seq(JsonObject *t)
+{
+    if (!json_object_has_member(t, FIELD_BTPK_PENDING_SEQ))
+        return -1;
+    return json_object_get_int_member(t, FIELD_BTPK_PENDING_SEQ);
+}
+
+JsonArray *torrent_get_btpk_history(JsonObject *t)
+{
+    if (!json_object_has_member(t, FIELD_BTPK_HISTORY))
+        return NULL;
+    return json_object_get_array_member(t, FIELD_BTPK_HISTORY);
+}
