@@ -1384,6 +1384,7 @@ static void trg_main_window_conn_changed(TrgMainWindow *win, gboolean connected)
     gtk_widget_set_sensitive(GTK_WIDGET(win->filesTreeView), connected);
     gtk_widget_set_sensitive(GTK_WIDGET(win->trackersTreeView), connected);
     gtk_widget_set_sensitive(GTK_WIDGET(win->genDetails), connected);
+    gtk_widget_set_sensitive(GTK_WIDGET(win->historyTreeView), connected);
 
     if (connected) {
         TrgPrefs *prefs = trg_client_get_prefs(win->client);
