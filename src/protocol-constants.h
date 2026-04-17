@@ -206,7 +206,13 @@ enum {
 #define FIELD_BTPK_SEQ           "btpk_seq"
 #define FIELD_BTPK_UPDATE_MODE   "btpk_update_mode"
 #define FIELD_BTPK_PENDING_SEQ   "btpk_pending_seq"
-#define FIELD_BTPK_HISTORY       "btpk_history"
+#define FIELD_BTPK_HISTORY             "btpk_history"
+#define FIELD_BTPK_ALLOW_ADDITIONAL    "btpk_allow_additional"
+#define FIELD_BTPK_ALLOW_RENAMING      "btpk_allow_renaming"
+#define FIELD_BTPK_ALLOW_OVERWRITES    "btpk_allow_overwrites"
+#define FIELD_BTPK_ALLOW_DELETIONS     "btpk_allow_deletions"
+#define FIELD_BTPK_VERSIONS_TO_KEEP    "btpk_versions_to_keep"
+#define FIELD_BTPK_MAX_STORAGE_GB      "btpk_max_storage_gb"
 
 /* btpk RPC methods */
 

@@ -548,6 +548,28 @@ static GtkWidget *trg_rprefs_connPage(TrgRemotePrefsDialog *win, JsonObject *s)
 }
 
 
+static void mutable_mode_changed_cb(GtkComboBoxText *combo, gpointer user_data)
+{
+    GtkWidget **dep_widgets = (GtkWidget **)user_data;
+    gint active = gtk_combo_box_get_active(GTK_COMBO_BOX(combo));
+
+    /* dep_widgets[0..3] = allow checkboxes (shown for "When offered")
+     * dep_widgets[4..5] = versions/storage spinners (shown for "Always versioned") */
+    gboolean when_offered = (active == 1);
+    gboolean versioned = (active == 2);
+
+    for (int i = 0; i < 4; i++)
+        gtk_widget_set_sensitive(dep_widgets[i], when_offered);
+    for (int i = 4; i < 6; i++)
+        gtk_widget_set_sensitive(dep_widgets[i], versioned);
+}
+
+static void trg_json_widget_combo_int_save(GtkWidget *widget, JsonObject *obj, gchar *key)
+{
+    json_object_set_int_member(obj, key,
+        (gint64)gtk_combo_box_get_active(GTK_COMBO_BOX(widget)));
+}
+
 static GtkWidget *trg_rprefs_mutablePage(TrgRemotePrefsDialog *win, JsonObject *json)
 {
     GtkWidget *w, *t;
@@ -557,37 +579,68 @@ static GtkWidget *trg_rprefs_mutablePage(TrgRemotePrefsDialog *win, JsonObject *
 
     hig_workarea_add_section_title(t, &row, _("Update Behavior"));
 
-    w = trg_json_widget_spin_int_new(&win->widgets, json, SGET_BTPK_DEFAULT_UPDATE_MODE, NULL,
-                                     0, 2, 1);
-    hig_workarea_add_row(t, &row, _("Update mode (0=Never, 1=Offered, 2=Versioned)"), w, w);
+    /* Combo box for update mode — labels match macOS client */
+    GtkWidget *combo = gtk_combo_box_text_new();
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), _("Never"));
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), _("When offered"));
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), _("Always versioned"));
+    {
+        gint64 mode = 0;
+        if (json_object_has_member(json, SGET_BTPK_DEFAULT_UPDATE_MODE))
+            mode = json_object_get_int_member(json, SGET_BTPK_DEFAULT_UPDATE_MODE);
+        gtk_combo_box_set_active(GTK_COMBO_BOX(combo), (gint)mode);
+    }
+
+    /* Register the combo with the json widget save system */
+    {
+        trg_json_widget_desc *wd = g_new0(trg_json_widget_desc, 1);
+        wd->widget = combo;
+        wd->key = g_strdup(SGET_BTPK_DEFAULT_UPDATE_MODE);
+        wd->saveFunc = trg_json_widget_combo_int_save;
+        win->widgets = g_list_append(win->widgets, wd);
+    }
+    hig_workarea_add_row(t, &row, _("Update behavior"), combo, NULL);
 
     hig_workarea_add_section_title(t, &row, _("Allowed Changes"));
 
-    w = trg_json_widget_check_new(&win->widgets, json, SGET_BTPK_DEFAULT_ALLOW_ADDITIONAL,
-                                  _("Allow additional files"), NULL);
-    hig_workarea_add_wide_control(t, &row, w);
+    GtkWidget *chk_additional = trg_json_widget_check_new(&win->widgets, json,
+        SGET_BTPK_DEFAULT_ALLOW_ADDITIONAL, _("Allow additional files"), NULL);
+    hig_workarea_add_wide_control(t, &row, chk_additional);
 
-    w = trg_json_widget_check_new(&win->widgets, json, SGET_BTPK_DEFAULT_ALLOW_RENAMING,
-                                  _("Allow file renaming"), NULL);
-    hig_workarea_add_wide_control(t, &row, w);
+    GtkWidget *chk_renaming = trg_json_widget_check_new(&win->widgets, json,
+        SGET_BTPK_DEFAULT_ALLOW_RENAMING, _("Allow file renaming"), NULL);
+    hig_workarea_add_wide_control(t, &row, chk_renaming);
 
-    w = trg_json_widget_check_new(&win->widgets, json, SGET_BTPK_DEFAULT_ALLOW_OVERWRITES,
-                                  _("Allow file overwrites"), NULL);
-    hig_workarea_add_wide_control(t, &row, w);
+    GtkWidget *chk_overwrites = trg_json_widget_check_new(&win->widgets, json,
+        SGET_BTPK_DEFAULT_ALLOW_OVERWRITES, _("Allow file overwrites"), NULL);
+    hig_workarea_add_wide_control(t, &row, chk_overwrites);
 
-    w = trg_json_widget_check_new(&win->widgets, json, SGET_BTPK_DEFAULT_ALLOW_DELETIONS,
-                                  _("Allow file deletions"), NULL);
-    hig_workarea_add_wide_control(t, &row, w);
+    GtkWidget *chk_deletions = trg_json_widget_check_new(&win->widgets, json,
+        SGET_BTPK_DEFAULT_ALLOW_DELETIONS, _("Allow file deletions"), NULL);
+    hig_workarea_add_wide_control(t, &row, chk_deletions);
 
     hig_workarea_add_section_title(t, &row, _("Version History"));
 
-    w = trg_json_widget_spin_int_new(&win->widgets, json, SGET_BTPK_DEFAULT_VERSIONS_TO_KEEP,
-                                     NULL, 0, 100, 1);
-    hig_workarea_add_row(t, &row, _("Keep most recent (versions)"), w, w);
+    GtkWidget *spin_versions = trg_json_widget_spin_int_new(&win->widgets, json,
+        SGET_BTPK_DEFAULT_VERSIONS_TO_KEEP, NULL, 0, 100, 1);
+    hig_workarea_add_row(t, &row, _("Keep most recent"), spin_versions, spin_versions);
 
-    w = trg_json_widget_spin_int_new(&win->widgets, json, SGET_BTPK_DEFAULT_MAX_STORAGE_GB,
-                                     NULL, 0, 10000, 1);
-    hig_workarea_add_row(t, &row, _("Maximum storage (GB)"), w, w);
+    GtkWidget *spin_storage = trg_json_widget_spin_int_new(&win->widgets, json,
+        SGET_BTPK_DEFAULT_MAX_STORAGE_GB, NULL, 0, 10000, 1);
+    hig_workarea_add_row(t, &row, _("Maximum storage (GB)"), spin_storage, spin_storage);
+
+    /* Wire up hide/show based on combo selection */
+    static GtkWidget *dep_widgets[6];
+    dep_widgets[0] = chk_additional;
+    dep_widgets[1] = chk_renaming;
+    dep_widgets[2] = chk_overwrites;
+    dep_widgets[3] = chk_deletions;
+    dep_widgets[4] = spin_versions;
+    dep_widgets[5] = spin_storage;
+
+    g_signal_connect(combo, "changed", G_CALLBACK(mutable_mode_changed_cb), dep_widgets);
+    /* Trigger initial sensitivity */
+    mutable_mode_changed_cb(GTK_COMBO_BOX_TEXT(combo), dep_widgets);
 
     return t;
 }

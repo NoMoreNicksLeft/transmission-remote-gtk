@@ -360,6 +360,91 @@ static void info_page_update(TrgTorrentPropsDialog *dialog, JsonObject *t,
     gtk_label_set_text(GTK_LABEL(dialog->have_lb), buf);
 }
 
+
+/* Forward declaration for the combo save used by both remote prefs and props dialogs */
+static void props_combo_int_save(GtkWidget *widget, JsonObject *obj, gchar *key)
+{
+    json_object_set_int_member(obj, key,
+        (gint64)gtk_combo_box_get_active(GTK_COMBO_BOX(widget)));
+}
+
+static void props_mutable_mode_changed_cb(GtkComboBoxText *combo, gpointer user_data)
+{
+    GtkWidget **dep = (GtkWidget **)user_data;
+    gint active = gtk_combo_box_get_active(GTK_COMBO_BOX(combo));
+    gboolean when_offered = (active == 1);
+    gboolean versioned = (active == 2);
+    for (int i = 0; i < 4; i++)
+        gtk_widget_set_sensitive(dep[i], when_offered);
+    for (int i = 4; i < 6; i++)
+        gtk_widget_set_sensitive(dep[i], versioned);
+}
+
+static GtkWidget *trg_props_mutable_page_new(TrgTorrentPropsDialog *win, JsonObject *json)
+{
+    GtkWidget *w, *t;
+    guint row = 0;
+
+    t = hig_workarea_create();
+
+    hig_workarea_add_section_title(t, &row, _("Update Behavior"));
+
+    GtkWidget *combo = gtk_combo_box_text_new();
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), _("Never"));
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), _("When offered"));
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), _("Always versioned"));
+    {
+        gint64 mode = 0;
+        if (json_object_has_member(json, FIELD_BTPK_UPDATE_MODE))
+            mode = json_object_get_int_member(json, FIELD_BTPK_UPDATE_MODE);
+        gtk_combo_box_set_active(GTK_COMBO_BOX(combo), (gint)mode);
+    }
+    {
+        trg_json_widget_desc *wd = g_new0(trg_json_widget_desc, 1);
+        wd->widget = combo;
+        wd->key = g_strdup(FIELD_BTPK_UPDATE_MODE);
+        wd->saveFunc = props_combo_int_save;
+        win->widgets = g_list_append(win->widgets, wd);
+    }
+    hig_workarea_add_row(t, &row, _("Update behavior"), combo, NULL);
+
+    hig_workarea_add_section_title(t, &row, _("Allowed Changes"));
+
+    GtkWidget *chk_add = trg_json_widget_check_new(&win->widgets, json,
+        FIELD_BTPK_ALLOW_ADDITIONAL, _("Allow additional files"), NULL);
+    hig_workarea_add_wide_control(t, &row, chk_add);
+
+    GtkWidget *chk_ren = trg_json_widget_check_new(&win->widgets, json,
+        FIELD_BTPK_ALLOW_RENAMING, _("Allow file renaming"), NULL);
+    hig_workarea_add_wide_control(t, &row, chk_ren);
+
+    GtkWidget *chk_ovw = trg_json_widget_check_new(&win->widgets, json,
+        FIELD_BTPK_ALLOW_OVERWRITES, _("Allow file overwrites"), NULL);
+    hig_workarea_add_wide_control(t, &row, chk_ovw);
+
+    GtkWidget *chk_del = trg_json_widget_check_new(&win->widgets, json,
+        FIELD_BTPK_ALLOW_DELETIONS, _("Allow file deletions"), NULL);
+    hig_workarea_add_wide_control(t, &row, chk_del);
+
+    hig_workarea_add_section_title(t, &row, _("Version History"));
+
+    GtkWidget *spin_ver = trg_json_widget_spin_int_new(&win->widgets, json,
+        FIELD_BTPK_VERSIONS_TO_KEEP, NULL, 0, 100, 1);
+    hig_workarea_add_row(t, &row, _("Keep most recent"), spin_ver, spin_ver);
+
+    GtkWidget *spin_gb = trg_json_widget_spin_int_new(&win->widgets, json,
+        FIELD_BTPK_MAX_STORAGE_GB, NULL, 0, 10000, 1);
+    hig_workarea_add_row(t, &row, _("Maximum storage (GB)"), spin_gb, spin_gb);
+
+    static GtkWidget *dep[6];
+    dep[0] = chk_add; dep[1] = chk_ren; dep[2] = chk_ovw; dep[3] = chk_del;
+    dep[4] = spin_ver; dep[5] = spin_gb;
+    g_signal_connect(combo, "changed", G_CALLBACK(props_mutable_mode_changed_cb), dep);
+    props_mutable_mode_changed_cb(GTK_COMBO_BOX_TEXT(combo), dep);
+
+    return t;
+}
+
 static GtkWidget *trg_props_limits_page_new(TrgTorrentPropsDialog *win, JsonObject *json)
 {
     GtkWidget *w, *tb, *t;
@@ -551,6 +636,12 @@ static GObject *trg_torrent_props_dialog_constructor(GType type, guint n_constru
 
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), trg_props_limits_page_new(propsDialog, json),
                              gtk_label_new(_("Limits")));
+
+    if (rowCount == 1 && json_object_has_member(json, FIELD_BTPK_PUB)) {
+        gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
+                                 trg_props_mutable_page_new(propsDialog, json),
+                                 gtk_label_new(_("Mutable")));
+    }
 
     gtk_container_set_border_width(GTK_CONTAINER(notebook), GUI_PAD);
 
