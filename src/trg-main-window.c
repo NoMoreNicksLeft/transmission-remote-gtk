@@ -99,6 +99,7 @@ static void pause_cb(GtkWidget *w, TrgMainWindow *win);
 static void resume_cb(GtkWidget *w, TrgMainWindow *win);
 static void remove_cb(GtkWidget *w, TrgMainWindow *win);
 static void start_version_cb(GtkWidget *w, TrgMainWindow *win);
+
 static void publish_update_cb(GtkWidget *w, TrgMainWindow *win);
 static void history_selection_changed_cb(GtkTreeSelection *sel, TrgMainWindow *win);
 static void resume_all_cb(GtkWidget *w, TrgMainWindow *win);
@@ -191,6 +192,9 @@ struct _TrgMainWindow {
     TrgPeersModel *peersModel;
     TrgPeersTreeView *peersTreeView;
     gboolean btpkSupported;
+    GtkWidget *btpkInfoBar;
+    GtkWidget *btpkInfoBarLabel;
+    gint64 btpkPendingTorrentId;
     TrgHistoryModel *historyModel;
     TrgHistoryTreeView *historyTreeView;
     GtkWidget *startVersionButton;
@@ -244,6 +248,25 @@ static void update_selected_torrent_notebook(TrgMainWindow *win, gint mode, gint
         trg_menu_bar_torrent_actions_sensitive(win->menuBar, TRUE);
         trg_general_panel_update(win->genDetails, t, &iter);
         trg_history_model_update(win->historyModel, t);
+
+        /* Check for pending btpk update on selected torrent */
+        if (torrent_has_btpk(t)) {
+            gint64 pending = torrent_get_btpk_pending_seq(t);
+            g_message("btpk check: name=%s has_btpk=yes pending=%" G_GINT64_FORMAT, torrent_get_name(t), pending);
+            if (pending >= 0) {
+                gchar *msg = g_strdup_printf(
+                    _("Mutable torrent \"%s\" has a new version available (seq %"
+                    G_GINT64_FORMAT ")"),
+                    torrent_get_name(t), pending);
+                gtk_label_set_text(GTK_LABEL(win->btpkInfoBarLabel), msg);
+                g_free(msg);
+                win->btpkPendingTorrentId = torrent_get_id(t);
+                gtk_widget_show(win->btpkInfoBar);
+            } else if (win->btpkPendingTorrentId == torrent_get_id(t)) {
+                gtk_widget_hide(win->btpkInfoBar);
+                win->btpkPendingTorrentId = -1;
+            }
+        }
         trg_trackers_model_update(win->trackersModel, serial, t, mode);
         trg_files_model_update(win->filesModel, GTK_TREE_VIEW(win->filesTreeView), serial, t, mode);
         trg_peers_model_update(win->peersModel, TRG_TREE_VIEW(win->peersTreeView), serial, t, mode);
@@ -683,6 +706,42 @@ static void move_cb(GtkWidget *w G_GNUC_UNUSED, TrgMainWindow *win)
         gtk_widget_show_all(
             GTK_WIDGET(trg_torrent_move_dialog_new(win, win->client, win->torrentTreeView)));
 }
+
+static void btpk_info_bar_response_cb(GtkInfoBar *info_bar, gint response_id, TrgMainWindow *win)
+{
+    if (response_id == GTK_RESPONSE_OK && win->btpkPendingTorrentId >= 0) {
+        /* Send btpk_apply RPC */
+        JsonNode *root = generic_request(METHOD_BTPK_APPLY, NULL);
+        JsonObject *args = node_get_arguments(root);
+        JsonArray *ids = json_array_new();
+        json_array_add_int_element(ids, win->btpkPendingTorrentId);
+        json_object_set_array_member(args, PARAM_IDS, ids);
+        dispatch_rpc_async(win->client, root, on_generic_interactive_action_response, win);
+    }
+    gtk_widget_hide(GTK_WIDGET(info_bar));
+    win->btpkPendingTorrentId = -1;
+}
+
+static void btpk_apply_clicked_cb(TrgMainWindow *win)
+{
+    if (win->btpkPendingTorrentId >= 0) {
+        JsonNode *root = generic_request(METHOD_BTPK_APPLY, NULL);
+        JsonObject *args = node_get_arguments(root);
+        JsonArray *ids = json_array_new();
+        json_array_add_int_element(ids, win->btpkPendingTorrentId);
+        json_object_set_array_member(args, PARAM_IDS, ids);
+        dispatch_rpc_async(win->client, root, on_generic_interactive_action_response, win);
+    }
+    gtk_widget_hide(win->btpkInfoBar);
+    win->btpkPendingTorrentId = -1;
+}
+
+static void btpk_dismiss_clicked_cb(TrgMainWindow *win)
+{
+    gtk_widget_hide(win->btpkInfoBar);
+    win->btpkPendingTorrentId = -1;
+}
+
 
 static void publish_update_cb(GtkWidget *w G_GNUC_UNUSED, TrgMainWindow *win)
 {
@@ -2158,6 +2217,29 @@ static GObject *trg_main_window_constructor(GType type, guint n_construct_proper
                      self);
 
     gtk_box_pack_start(GTK_BOX(outerVbox), GTK_WIDGET(toolbarHbox), FALSE, FALSE, 0);
+
+    /* btpk pending update notification bar (plain GtkBox) */
+    self->btpkInfoBar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_widget_set_margin_start(self->btpkInfoBar, 8);
+    gtk_widget_set_margin_end(self->btpkInfoBar, 8);
+    gtk_widget_set_margin_top(self->btpkInfoBar, 4);
+    gtk_widget_set_margin_bottom(self->btpkInfoBar, 4);
+    self->btpkInfoBarLabel = gtk_label_new("");
+    gtk_label_set_xalign(GTK_LABEL(self->btpkInfoBarLabel), 0.0f);
+    gtk_box_pack_start(GTK_BOX(self->btpkInfoBar), self->btpkInfoBarLabel, TRUE, TRUE, 0);
+    {
+        GtkWidget *apply_btn = gtk_button_new_with_label(_("Apply Update"));
+        g_signal_connect_swapped(apply_btn, "clicked", G_CALLBACK(btpk_apply_clicked_cb), self);
+        gtk_box_pack_end(GTK_BOX(self->btpkInfoBar), apply_btn, FALSE, FALSE, 0);
+        GtkWidget *dismiss_btn = gtk_button_new_with_label(_("Dismiss"));
+        g_signal_connect_swapped(dismiss_btn, "clicked", G_CALLBACK(btpk_dismiss_clicked_cb), self);
+        gtk_box_pack_end(GTK_BOX(self->btpkInfoBar), dismiss_btn, FALSE, FALSE, 0);
+    }
+    gtk_box_pack_start(GTK_BOX(outerVbox), self->btpkInfoBar, FALSE, FALSE, 0);
+    gtk_widget_show_all(self->btpkInfoBar);
+    gtk_widget_hide(self->btpkInfoBar);
+    gtk_widget_set_no_show_all(self->btpkInfoBar, TRUE);
+    self->btpkPendingTorrentId = -1;
 
     self->hpaned = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
     self->vpaned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
