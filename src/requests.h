@@ -53,5 +53,6 @@ void request_set_tag(JsonNode *req, gint64 tag);
 void request_set_tag_from_ids(JsonNode *req, JsonArray *ids);
 
 JsonNode *btpk_start_version(gint64 torrent_id, gint64 seq);
+JsonNode *btpk_publish(gint64 torrent_id, const gchar *private_key, gboolean continue_seeding);
 
 #endif /* REQUESTS_H_ */

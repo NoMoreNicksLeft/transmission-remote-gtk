@@ -314,3 +314,15 @@ JsonNode *btpk_start_version(gint64 torrent_id, gint64 seq)
     json_object_set_int_member(args, FIELD_BTPK_SEQ, seq);
     return root;
 }
+
+JsonNode *btpk_publish(gint64 torrent_id, const gchar *private_key, gboolean continue_seeding)
+{
+    JsonNode *root = base_request(METHOD_BTPK_PUBLISH);
+    JsonObject *args = node_get_arguments(root);
+    JsonArray *ids = json_array_new();
+    json_array_add_int_element(ids, torrent_id);
+    json_object_set_array_member(args, PARAM_IDS, ids);
+    json_object_set_string_member(args, PARAM_PRIVATE_KEY, private_key);
+    json_object_set_boolean_member(args, PARAM_CONTINUE_SEEDING, continue_seeding);
+    return root;
+}

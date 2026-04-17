@@ -65,7 +65,8 @@ enum {
     PROP_MOVE_UP_QUEUE,
     PROP_MOVE_BOTTOM_QUEUE,
     PROP_MOVE_TOP_QUEUE,
-    PROP_START_NOW
+    PROP_START_NOW,
+    PROP_PUBLISH_BUTTON
 };
 
 #define G_DATAKEY_CONF_KEY   "conf-key"
@@ -81,6 +82,7 @@ struct _TrgMenuBar {
     GtkWidget *mb_move;
     GtkWidget *mb_remove;
     GtkWidget *mb_delete;
+    GtkWidget *mb_publish;
     GtkWidget *mb_resume;
     GtkWidget *mb_pause;
     GtkWidget *mb_resume_all;
@@ -143,6 +145,7 @@ void trg_menu_bar_torrent_actions_sensitive(TrgMenuBar *mb, gboolean sensitive)
     gtk_widget_set_sensitive(mb->mb_copy_magnetlink, sensitive);
     gtk_widget_set_sensitive(mb->mb_remove, sensitive);
     gtk_widget_set_sensitive(mb->mb_delete, sensitive);
+    gtk_widget_set_sensitive(mb->mb_publish, sensitive);
     gtk_widget_set_sensitive(mb->mb_resume, sensitive);
     gtk_widget_set_sensitive(mb->mb_pause, sensitive);
     gtk_widget_set_sensitive(mb->mb_verify, sensitive);
@@ -197,6 +200,9 @@ static void trg_menu_bar_get_property(GObject *object, guint property_id, GValue
         break;
     case PROP_DELETE_BUTTON:
         g_value_set_object(value, self->mb_delete);
+        break;
+    case PROP_PUBLISH_BUTTON:
+        g_value_set_object(value, self->mb_publish);
         break;
     case PROP_MOVE_UP_QUEUE:
         g_value_set_object(value, self->mb_up_queue);
@@ -561,6 +567,9 @@ static GtkWidget *trg_menu_bar_torrent_menu_new(TrgMenuBar *mb)
         = trg_menu_bar_item_new(GTK_MENU_SHELL(torrentMenu), _("Remove and delete data"), FALSE);
     trg_menu_bar_accel_add(mb, mb->mb_delete, GDK_Delete, GDK_SHIFT_MASK);
 
+    gtk_menu_shell_append(GTK_MENU_SHELL(torrentMenu), gtk_separator_menu_item_new());
+    mb->mb_publish = trg_menu_bar_item_new(GTK_MENU_SHELL(torrentMenu), _("Publish Update..."), FALSE);
+
     mb->mb_queues_seperator = gtk_separator_menu_item_new();
     gtk_menu_shell_append(GTK_MENU_SHELL(torrentMenu), mb->mb_queues_seperator);
 
@@ -651,6 +660,8 @@ static void trg_menu_bar_class_init(TrgMenuBarClass *klass)
     trg_menu_bar_install_widget_prop(object_class, PROP_MOVE_BUTTON, "move-button", "Move Button");
     trg_menu_bar_install_widget_prop(object_class, PROP_DELETE_BUTTON, "delete-button",
                                      "Delete Button");
+    trg_menu_bar_install_widget_prop(object_class, PROP_PUBLISH_BUTTON, "publish-button",
+                                     "Publish Button");
     trg_menu_bar_install_widget_prop(object_class, PROP_RESUME_BUTTON, "resume-button",
                                      "Resume Button");
     trg_menu_bar_install_widget_prop(object_class, PROP_RESUME_ALL_BUTTON, "resume-all-button",

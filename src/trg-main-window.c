@@ -99,6 +99,7 @@ static void pause_cb(GtkWidget *w, TrgMainWindow *win);
 static void resume_cb(GtkWidget *w, TrgMainWindow *win);
 static void remove_cb(GtkWidget *w, TrgMainWindow *win);
 static void start_version_cb(GtkWidget *w, TrgMainWindow *win);
+static void publish_update_cb(GtkWidget *w, TrgMainWindow *win);
 static void history_selection_changed_cb(GtkTreeSelection *sel, TrgMainWindow *win);
 static void resume_all_cb(GtkWidget *w, TrgMainWindow *win);
 static void pause_all_cb(GtkWidget *w, TrgMainWindow *win);
@@ -536,13 +537,13 @@ static TrgToolbar *trg_main_window_toolbar_new(TrgMainWindow *win)
     TrgPrefs *prefs = trg_client_get_prefs(win->client);
 
     GObject *b_connect, *b_disconnect, *b_add, *b_resume, *b_pause;
-    GObject *b_remove, *b_delete, *b_props, *b_local_prefs, *b_remote_prefs;
+    GObject *b_remove, *b_delete, *b_publish, *b_props, *b_local_prefs, *b_remote_prefs;
 
     TrgToolbar *toolBar = trg_toolbar_new(win, prefs);
 
     g_object_get(toolBar, "connect-button", &b_connect, "disconnect-button", &b_disconnect,
                  "add-button", &b_add, "resume-button", &b_resume, "pause-button", &b_pause,
-                 "delete-button", &b_delete, "remove-button", &b_remove, "props-button", &b_props,
+                 "delete-button", &b_delete, "publish-button", &b_publish, "remove-button", &b_remove, "props-button", &b_props,
                  "remote-prefs-button", &b_remote_prefs, "local-prefs-button", &b_local_prefs,
                  NULL);
 
@@ -552,6 +553,7 @@ static TrgToolbar *trg_main_window_toolbar_new(TrgMainWindow *win)
     g_signal_connect(b_resume, "clicked", G_CALLBACK(resume_cb), win);
     g_signal_connect(b_pause, "clicked", G_CALLBACK(pause_cb), win);
     g_signal_connect(b_delete, "clicked", G_CALLBACK(delete_cb), win);
+    g_signal_connect(b_publish, "clicked", G_CALLBACK(publish_update_cb), win);
     g_signal_connect(b_remove, "clicked", G_CALLBACK(remove_cb), win);
     g_signal_connect(b_props, "clicked", G_CALLBACK(open_props_cb), win);
     g_signal_connect(b_local_prefs, "clicked", G_CALLBACK(open_local_prefs_cb), win);
@@ -680,6 +682,73 @@ static void move_cb(GtkWidget *w G_GNUC_UNUSED, TrgMainWindow *win)
     if (is_ready_for_torrent_action(win))
         gtk_widget_show_all(
             GTK_WIDGET(trg_torrent_move_dialog_new(win, win->client, win->torrentTreeView)));
+}
+
+static void publish_update_cb(GtkWidget *w G_GNUC_UNUSED, TrgMainWindow *win)
+{
+    if (!is_ready_for_torrent_action(win))
+        return;
+
+    gint64 torrent_id = win->selectedTorrentId;
+    if (torrent_id < 0)
+        return;
+
+    /* Build a simple dialog with PEM text field + continue seeding checkbox */
+    GtkWidget *dialog = gtk_dialog_new_with_buttons(
+        _("Publish Update"),
+        GTK_WINDOW(win),
+        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+        _("_Cancel"), GTK_RESPONSE_CANCEL,
+        _("_Publish"), GTK_RESPONSE_OK,
+        NULL);
+
+    gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
+
+    GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    gtk_container_set_border_width(GTK_CONTAINER(content), 8);
+    gtk_box_set_spacing(GTK_BOX(content), 8);
+
+    /* PEM key label */
+    GtkWidget *label = gtk_label_new(_("Private key (PEM format):"));
+    gtk_widget_set_halign(label, GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(content), label, FALSE, FALSE, 0);
+
+    /* PEM text view in a scrolled window */
+    GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled),
+                                   GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+    gtk_widget_set_size_request(scrolled, 400, 120);
+
+    GtkWidget *textview = gtk_text_view_new();
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
+    gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(textview), GTK_WRAP_CHAR);
+    gtk_container_add(GTK_CONTAINER(scrolled), textview);
+    gtk_box_pack_start(GTK_BOX(content), scrolled, TRUE, TRUE, 0);
+
+    /* Continue seeding checkbox */
+    GtkWidget *check = gtk_check_button_new_with_label(_("Continue seeding previous version"));
+    gtk_box_pack_start(GTK_BOX(content), check, FALSE, FALSE, 0);
+
+    gtk_widget_show_all(content);
+
+    gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+
+    if (response == GTK_RESPONSE_OK) {
+        GtkTextIter start, end;
+        gtk_text_buffer_get_start_iter(buffer, &start);
+        gtk_text_buffer_get_end_iter(buffer, &end);
+        gchar *pem_text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
+        gboolean continue_seeding = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check));
+
+        if (pem_text && strlen(pem_text) > 0) {
+            dispatch_rpc_async(win->client,
+                               btpk_publish(torrent_id, pem_text, continue_seeding),
+                               on_generic_interactive_action_response, win);
+        }
+        g_free(pem_text);
+    }
+
+    gtk_widget_destroy(dialog);
 }
 
 static void start_version_cb(GtkWidget *w G_GNUC_UNUSED, TrgMainWindow *win)
@@ -961,6 +1030,9 @@ static gboolean on_session_get(gpointer data)
     }
 
     if (!isConnected) {
+        /* Detect btpk support from session response */
+        win->btpkSupported = newSession && json_object_has_member(newSession, SGET_BTPK_SUPPORTED)
+            && json_object_get_boolean_member(newSession, SGET_BTPK_SUPPORTED);
         trg_main_window_conn_changed(win, TRUE);
         trg_trackers_tree_view_new_connection(win->trackersTreeView, client);
         dispatch_rpc_async(client, torrent_get(TORRENT_GET_TAG_MODE_FULL), on_torrent_get_first,
@@ -1387,6 +1459,18 @@ static void trg_main_window_conn_changed(TrgMainWindow *win, gboolean connected)
     gtk_widget_set_sensitive(GTK_WIDGET(win->genDetails), connected);
     gtk_widget_set_sensitive(GTK_WIDGET(win->historyTreeView), connected);
 
+    /* Show/hide History tab based on btpk support */
+    {
+        gint n_pages = gtk_notebook_get_n_pages(GTK_NOTEBOOK(win->notebook));
+        if (n_pages > 4) {
+            GtkWidget *history_page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(win->notebook), 4);
+            if (connected && win->btpkSupported)
+                gtk_widget_show(history_page);
+            else if (connected && !win->btpkSupported)
+                gtk_widget_hide(history_page);
+        }
+    }
+
     if (connected) {
         TrgPrefs *prefs = trg_client_get_prefs(win->client);
         win->sessionTimerId = g_timeout_add_seconds(
@@ -1443,7 +1527,7 @@ static void quit_cb(GtkWidget *w G_GNUC_UNUSED, gpointer data)
 static TrgMenuBar *trg_main_window_menu_bar_new(TrgMainWindow *win)
 {
 
-    GObject *b_disconnect, *b_add, *b_resume, *b_pause, *b_verify, *b_remove, *b_delete, *b_props,
+    GObject *b_disconnect, *b_add, *b_resume, *b_pause, *b_verify, *b_remove, *b_delete, *b_publish, *b_props,
         *b_local_prefs, *b_remote_prefs, *b_about, *b_view_states, *b_view_notebook, *b_view_stats,
         *b_add_url, *b_quit, *b_move, *b_reannounce, *b_pause_all, *b_resume_all, *b_dir_filters,
         *b_tracker_filters, *b_directories_first, *b_up_queue, *b_down_queue, *b_top_queue,
@@ -1460,7 +1544,7 @@ static TrgMenuBar *trg_main_window_menu_bar_new(TrgMainWindow *win)
     g_object_get(
         menuBar, "disconnect-button", &b_disconnect, "add-button", &b_add, "add-url-button",
         &b_add_url, "resume-button", &b_resume, "resume-all-button", &b_resume_all, "pause-button",
-        &b_pause, "pause-all-button", &b_pause_all, "delete-button", &b_delete, "remove-button",
+        &b_pause, "pause-all-button", &b_pause_all, "delete-button", &b_delete, "publish-button", &b_publish, "remove-button",
         &b_remove, "move-button", &b_move, "verify-button", &b_verify, "reannounce-button",
         &b_reannounce, "props-button", &b_props, "remote-prefs-button", &b_remote_prefs,
         "local-prefs-button", &b_local_prefs, "view-notebook-button", &b_view_notebook,
@@ -1480,6 +1564,7 @@ static TrgMenuBar *trg_main_window_menu_bar_new(TrgMainWindow *win)
     g_signal_connect(b_verify, "activate", G_CALLBACK(verify_cb), win);
     g_signal_connect(b_reannounce, "activate", G_CALLBACK(reannounce_cb), win);
     g_signal_connect(b_delete, "activate", G_CALLBACK(delete_cb), win);
+    g_signal_connect(b_publish, "activate", G_CALLBACK(publish_update_cb), win);
     g_signal_connect(b_remove, "activate", G_CALLBACK(remove_cb), win);
     g_signal_connect(b_up_queue, "activate", G_CALLBACK(up_queue_cb), win);
     g_signal_connect(b_down_queue, "activate", G_CALLBACK(down_queue_cb), win);
@@ -1739,6 +1824,12 @@ static void trg_torrent_tv_view_menu(GtkWidget *treeview, GdkEventButton *event,
                           G_CALLBACK(remove_cb), win);
     trg_imagemenuitem_new(GTK_MENU_SHELL(menu), _("Remove and delete data"), "edit-delete", TRUE,
                           G_CALLBACK(delete_cb), win);
+
+    if (win->btpkSupported) {
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());
+        trg_imagemenuitem_new(GTK_MENU_SHELL(menu), _("Publish Update..."), NULL, TRUE,
+                              G_CALLBACK(publish_update_cb), win);
+    }
 
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());
 
