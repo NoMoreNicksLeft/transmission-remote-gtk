@@ -547,6 +547,51 @@ static GtkWidget *trg_rprefs_connPage(TrgRemotePrefsDialog *win, JsonObject *s)
     return t;
 }
 
+
+static GtkWidget *trg_rprefs_mutablePage(TrgRemotePrefsDialog *win, JsonObject *json)
+{
+    GtkWidget *w, *t;
+    guint row = 0;
+
+    t = hig_workarea_create();
+
+    hig_workarea_add_section_title(t, &row, _("Update Behavior"));
+
+    w = trg_json_widget_spin_int_new(&win->widgets, json, SGET_BTPK_DEFAULT_UPDATE_MODE, NULL,
+                                     0, 2, 1);
+    hig_workarea_add_row(t, &row, _("Update mode (0=Never, 1=Offered, 2=Versioned)"), w, w);
+
+    hig_workarea_add_section_title(t, &row, _("Allowed Changes"));
+
+    w = trg_json_widget_check_new(&win->widgets, json, SGET_BTPK_DEFAULT_ALLOW_ADDITIONAL,
+                                  _("Allow additional files"), NULL);
+    hig_workarea_add_wide_control(t, &row, w);
+
+    w = trg_json_widget_check_new(&win->widgets, json, SGET_BTPK_DEFAULT_ALLOW_RENAMING,
+                                  _("Allow file renaming"), NULL);
+    hig_workarea_add_wide_control(t, &row, w);
+
+    w = trg_json_widget_check_new(&win->widgets, json, SGET_BTPK_DEFAULT_ALLOW_OVERWRITES,
+                                  _("Allow file overwrites"), NULL);
+    hig_workarea_add_wide_control(t, &row, w);
+
+    w = trg_json_widget_check_new(&win->widgets, json, SGET_BTPK_DEFAULT_ALLOW_DELETIONS,
+                                  _("Allow file deletions"), NULL);
+    hig_workarea_add_wide_control(t, &row, w);
+
+    hig_workarea_add_section_title(t, &row, _("Version History"));
+
+    w = trg_json_widget_spin_int_new(&win->widgets, json, SGET_BTPK_DEFAULT_VERSIONS_TO_KEEP,
+                                     NULL, 0, 100, 1);
+    hig_workarea_add_row(t, &row, _("Keep most recent (versions)"), w, w);
+
+    w = trg_json_widget_spin_int_new(&win->widgets, json, SGET_BTPK_DEFAULT_MAX_STORAGE_GB,
+                                     NULL, 0, 10000, 1);
+    hig_workarea_add_row(t, &row, _("Maximum storage (GB)"), w, w);
+
+    return t;
+}
+
 static GtkWidget *trg_rprefs_generalPage(TrgRemotePrefsDialog *win, JsonObject *s)
 {
     GtkWidget *w, *tb, *t;
@@ -637,6 +682,12 @@ static GObject *trg_remote_prefs_dialog_constructor(GType type, guint n_construc
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
                              trg_rprefs_limitsPage(TRG_REMOTE_PREFS_DIALOG(object), session),
                              gtk_label_new(_("Limits")));
+
+    if (json_object_has_member(session, SGET_BTPK_DEFAULT_UPDATE_MODE)) {
+        gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
+                                 trg_rprefs_mutablePage(TRG_REMOTE_PREFS_DIALOG(object), session),
+                                 gtk_label_new(_("Mutable")));
+    }
 
     gtk_container_set_border_width(GTK_CONTAINER(notebook), GUI_PAD);
 

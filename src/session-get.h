@@ -112,4 +112,13 @@ gboolean session_get_alt_speed_enabled(JsonObject *s);
 gint64 session_get_alt_speed_limit_up(JsonObject *s);
 gint64 session_get_alt_speed_limit_down(JsonObject *s);
 
+/* btpk session defaults */
+#define SGET_BTPK_DEFAULT_UPDATE_MODE        "btpk_default_update_mode"
+#define SGET_BTPK_DEFAULT_ALLOW_ADDITIONAL    "btpk_default_allow_additional"
+#define SGET_BTPK_DEFAULT_ALLOW_RENAMING      "btpk_default_allow_renaming"
+#define SGET_BTPK_DEFAULT_ALLOW_OVERWRITES    "btpk_default_allow_overwrites"
+#define SGET_BTPK_DEFAULT_ALLOW_DELETIONS     "btpk_default_allow_deletions"
+#define SGET_BTPK_DEFAULT_VERSIONS_TO_KEEP    "btpk_default_versions_to_keep"
+#define SGET_BTPK_DEFAULT_MAX_STORAGE_GB      "btpk_default_max_storage_gb"
+
 #endif /* SESSION_GET_H_ */
