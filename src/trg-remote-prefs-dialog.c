@@ -599,7 +599,7 @@ static GtkWidget *trg_rprefs_mutablePage(TrgRemotePrefsDialog *win, JsonObject *
         wd->saveFunc = trg_json_widget_combo_int_save;
         win->widgets = g_list_append(win->widgets, wd);
     }
-    hig_workarea_add_row(t, &row, _("Update behavior"), combo, NULL);
+    hig_workarea_add_wide_control(t, &row, combo);
 
     hig_workarea_add_section_title(t, &row, _("Allowed Changes"));
 
