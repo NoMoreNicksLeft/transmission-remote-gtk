@@ -189,6 +189,7 @@ struct _TrgMainWindow {
 
     TrgPeersModel *peersModel;
     TrgPeersTreeView *peersTreeView;
+    gboolean btpkSupported;
     TrgHistoryModel *historyModel;
     TrgHistoryTreeView *historyTreeView;
     GtkWidget *startVersionButton;

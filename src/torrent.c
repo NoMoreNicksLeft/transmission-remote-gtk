@@ -680,6 +680,13 @@ const gchar *file_get_name(JsonObject *f)
     return json_object_get_string_member(f, TFILE_NAME);
 }
 
+const gchar *torrent_get_metainfo_version(JsonObject *t)
+{
+    if (!json_object_has_member(t, FIELD_METAINFO_VERSION))
+        return NULL;
+    return json_object_get_string_member(t, FIELD_METAINFO_VERSION);
+}
+
 /* btpk / mutable torrent (BEP 46) accessors */
 
 gboolean torrent_has_btpk(JsonObject *t)

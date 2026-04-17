@@ -112,6 +112,8 @@ gboolean session_get_alt_speed_enabled(JsonObject *s);
 gint64 session_get_alt_speed_limit_up(JsonObject *s);
 gint64 session_get_alt_speed_limit_down(JsonObject *s);
 
+#define SGET_BTPK_SUPPORTED                   "btpk_supported"
+
 /* btpk session defaults */
 #define SGET_BTPK_DEFAULT_UPDATE_MODE        "btpk_default_update_mode"
 #define SGET_BTPK_DEFAULT_ALLOW_ADDITIONAL    "btpk_default_allow_additional"

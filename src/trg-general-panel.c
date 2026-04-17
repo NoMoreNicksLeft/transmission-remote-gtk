@@ -61,6 +61,7 @@ struct _TrgGeneralPanel {
     GtkLabel *gen_downloaddir_label;
     GtkLabel *gen_comment_label;
     GtkLabel *gen_hash_label;
+    GtkLabel *gen_format_label;
     GtkLabel *gen_error_label;
     GtkLabel *gen_btpk_pub_label;
     GtkLabel *gen_btpk_salt_label;
@@ -94,6 +95,7 @@ void trg_general_panel_clear(TrgGeneralPanel *panel)
     gtk_label_clear(panel->gen_downloaddir_label);
     gtk_label_clear(panel->gen_comment_label);
     gtk_label_clear(panel->gen_hash_label);
+    gtk_label_clear(panel->gen_format_label);
     gtk_label_clear(panel->gen_error_label);
     gtk_label_clear(gen_panel_label_get_key_label(GTK_LABEL(panel->gen_error_label)));
     gtk_label_clear(panel->gen_btpk_pub_label);
@@ -161,6 +163,20 @@ void trg_general_panel_update(TrgGeneralPanel *panel, JsonObject *t, GtkTreeIter
     gtk_label_set_text(GTK_LABEL(panel->gen_uploaded_label), buf);
 
     gtk_label_set_text(GTK_LABEL(panel->gen_hash_label), torrent_get_hash(t));
+
+    /* torrent format version */
+    {
+        const gchar *ver = torrent_get_metainfo_version(t);
+        if (ver) {
+            const gchar *label = "Unknown";
+            if (g_strcmp0(ver, "1") == 0) label = "BitTorrent v1";
+            else if (g_strcmp0(ver, "2") == 0) label = "BitTorrent v2";
+            else if (g_strcmp0(ver, "1+2") == 0) label = "BitTorrent v1+v2 (Hybrid)";
+            gtk_label_set_text(GTK_LABEL(panel->gen_format_label), label);
+        } else {
+            gtk_label_clear(panel->gen_format_label);
+        }
+    }
 
     haveValid = torrent_get_have_valid(t);
     trg_strlsize(buf, torrent_get_downloaded(t));
@@ -359,6 +375,8 @@ static void trg_general_panel_init(TrgGeneralPanel *self)
     self->gen_comment_label = trg_general_panel_add_label(self, _("Comment"), 0, 7);
 
     self->gen_hash_label = trg_general_panel_add_label(self, _("Hash"), 0, 8);
+
+    self->gen_format_label = trg_general_panel_add_label(self, _("Format"), 1, 8);
 
     self->gen_error_label = trg_general_panel_add_label_with_width(self, "", 0, 9, -1);
 

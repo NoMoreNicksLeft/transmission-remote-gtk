@@ -197,6 +197,8 @@ enum {
 #define TFILE_BYTES_COMPLETED "bytesCompleted"
 #define TFILE_NAME            "name"
 
+#define FIELD_METAINFO_VERSION    "metainfo_version"
+
 /* btpk / mutable torrent (BEP 46) fields */
 
 #define FIELD_BTPK_PUB           "btpk_pub"
